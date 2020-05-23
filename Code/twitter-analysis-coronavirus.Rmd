@@ -1,0 +1,520 @@
+---
+title: "Text mining and sentiment analysis using Twitter data about Coronavirus"
+author: "<b> CSDA1040 Group2 - Fanny, Deenu, Dave and Kaustubh </b>"
+date: "28/01/2020"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+    fig_caption: yes  
+    fig_height: 6
+    fig.align: center
+    fig_width: 10
+    df_print: paged
+    keep_md: yes
+    number_sections: yes
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEncoding{UTF-8}
+  %\VignetteEngine{knitr::rmarkdown}
+editor_options: 
+  chunk_output_type: console
+---
+
+# Objectives
+
+The `Coronavirus` outbreak that began in the Chinese city of Wuhan, is now an international public health emergency, bigger than SARs outbreak in 2003. Our objective is to ingest the live data from twitter and apply principles of machine learning using `natural language processing (NLP)` and `sentiment analysis` to understand the outbreak and social media’s `feel` regarding the highly contagious disease that has already killed thousands of people and is alarming the world. 
+
+The statistics behind the data visualization are being collected from a social networking site Twitter for real-time data with hashtags of the World Health Organization (WHO), the Centers for Disease Control and Prevention (CDC GOV), and #Coronavirus. Media outlets including PBS news hour, CBC news and ABC news associated with the subject have cited in our data collection. Twitter is a micro blogging service generating vast data for social purposes. This social networking site widely popular for data scientists as thye allows data to be collected easily using their application programming interface. This is captured in an unstructured, nonstandardized, free-text form. Accurately measuring the sentiment of an coronavirus outbreak tweet represents an opportunity for understanding both the people who are affected and people around the world opinions on this subject.
+
+The aim of this study is to determine the extent of `the messaging/sentiment` regarding Coronavirus. While doing so, we will ensure that we follow the Ethical Machine Learning framework outlined at.
+
+Sentiment analysis allows the content of free-text natural language—that is, the words and symbols used in a message—to be examined for the intensity of positive and negative opinions and emotions. Sentiment analysis from social media is already a widely researched subject.
+
+##Project Objectives
+
+To extract significant information from text using data mining technique. We will be using three important packages: twitteR, tm and wordcloud. Package twitteR [Gentry, 2015] provides access to Twitter data, tm [Feinerer and Hornik, 2015] provides functions for text mining such as xxxx , and wordcloud [Fellows, 2014] visualizes the results of with a word cloud.
+
+  * Implement CRISP-DM methodology for the project to study on coronavirus and provide insights and trends 
+  * Implement concepts of text mining and web scraping to extract data from twitter and data cleansing using ML techniques
+  * Extract tweets and followers from the Twitter website with R and the twitteR package
+  * Transforming text  such as removing punctuation; eliminating stop words - “The most common words in text documents are articles, prepositions, and pronouns” (Tarsem Singh / (IJCSIT) International Journal of Computer Science and Information Technologies, Vol. 7 (1) , 2016, 167-169”  
+  * With the tm package, clean text by removing punctuations, numbers, hyperlinks and stop words, followed by stemming and stem completion
+  * Build a term-document matrix
+  * Analyse sentiment with the sentiment140 package
+  * Analyse following/followed and retweeting relationships with the igraph package
+  * Analyze words association with subject (global panic, cure, state of emergency) 
+  * Apply clustering algorithm to group or label topics
+  * Generate hierarchical cluster plots 
+  * Find top ten trending words relevant to the subject
+  * Perform sentiment analysis
+  * Deploy the Shiny application
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#read time execution completion
+start  =  Sys.time()
+
+```
+
+
+```{r}
+#Function to lable x axis text to angle 90, and turn off legend.
+theme_function = function() {
+  theme_bw() + 
+    theme(legend.position="none",
+          plot.title = element_text(size=16, hjust=0.5), 
+          axis.text.x = element_text(angle=90)
+          )
+  }
+```
+
+
+Before loading the data, we start by installing and evoking all the necessary libraries that are going to be used for data analysis as well as for running the `Apriori principle (ML)`.
+
+```{r message=FALSE}
+library(twitteR)
+library(tm)
+library(stopwords)
+library(ggplot2)
+library(tidytext)
+library(lubridate)
+library(tidyverse)
+library(plotly)
+library(knitr)
+library(kableExtra)
+
+#install.packages("devtools")
+#devtools::install_github("yixuan/prettydoc")
+```
+
+# Data Preparation
+
+## Describe Data
+Our data consist of a real-time, gathered and mined textual information from `Twitter` via its Application Programming Interface using hashtags from the `World Health Organization (WHO)`, the `Centers for Disease Control and Prevention (CDC GOV)`, and `#Coronavirus`. Media outlets including `PBS news hour`, `CBC news` and `ABC news` associated with the subject have cited in our data collection. We have collected about 11023 tweets and 8 columns.
+
+Data Dictionary:
+ * text (string)
+ * created (date)
+ * truncated (boolean)
+ * id (char)
+ * screenName (char)
+ * retweetCount (num)
+ * isRetweet (boolean)
+ * retweeted (boolean)
+ 
+The first step is to create a Twitter application for yourself. Go to #https://twitter.com/apps/new and log in. After filling in the basic info, go to the "Settings" tab and select "Read, Write and Access direct messages". Make sure to click on the save button after doing this. In the "Details" tab, take note of your consumer key and consumer secret.
+
+```{r}
+#Set up twitter access
+
+#Read the Twitter API login credentials from csv
+Twitter_API  =  read.csv(file  =  "C:/Users/kaust/OneDrive/York U/CSDA 1040 material/Project 2/TwitterAPI.csv", 
+                            stringsAsFactors  =  FALSE, 
+                            header  =  FALSE,
+                            na.strings  =  "")
+
+#Twitter API credentials
+consumerAPIKey = Twitter_API[1]
+consumerSecret = Twitter_API[2]
+accessToken = Twitter_API[3]
+accessTokenSecret = Twitter_API[4]
+
+#Invoke authentication
+setup_twitter_oauth(consumerAPIKey, consumerSecret, accessToken, accessTokenSecret)
+```
+
+##Data Extraction (Tweets)
+Extract the tweets from the Twitter Hashtags and convert to a dataframe
+```{r}
+df_coronavirus = searchTwitter('#coronavirus + #who', since = '2019-12-01', n = 10000, lang = "en")
+tweets_coronavirus1.df = twListToDF(df_coronavirus)
+
+df_coronavirus_2 = searchTwitter('#coronavirus + #cdcgov', since = '2019-12-01', n = 10000, lang = "en")
+tweets_coronavirus2.df = twListToDF(df_coronavirus_2)
+
+df_coronavirus_3 = searchTwitter('#coronavirus + #pbsnewshour', since = '2019-12-01', n = 10000, lang = "en")
+tweets_coronavirus3.df = twListToDF(df_coronavirus_3)
+
+df_coronavirus_4 = searchTwitter('#coronavirus + #emergency', since = '2019-12-01', n = 10000, lang = "en")
+tweets_coronavirus4.df = twListToDF(df_coronavirus_4)
+
+df_coronavirus_5 = searchTwitter('#coronavirus + #medicine', since = '2019-12-01', n = 10000, lang = "en")
+tweets_coronavirus5.df = twListToDF(df_coronavirus_5)
+
+df_coronavirus_6 = searchTwitter('#coronavirus + #economy', since = '2019-12-01', n = 10000, lang = "en")
+tweets_coronavirus6.df = twListToDF(df_coronavirus_6)
+
+df_coronavirus_7 = searchTwitter('#coronavirus + #abcnews', since = '2019-12-01', n = 10000, lang = "en")
+tweets_coronavirus7.df = twListToDF(df_coronavirus_7)
+
+df_coronavirus_8 = searchTwitter('#coronavirus + #cbcnews', since = '2019-12-01', n = 10000, lang = "en")
+tweets_coronavirus8.df = twListToDF(df_coronavirus_8)
+
+df_coronavirus_9 = searchTwitter('#coronavirus + #silenced', since = '2019-12-01', n = 10000, lang = "en")
+tweets_coronavirus9.df = twListToDF(df_coronavirus_9)
+
+#bind all the tables
+corona_virus_tweets_df = rbind(tweets_coronavirus1.df, 
+                               tweets_coronavirus4.df, 
+                               tweets_coronavirus5.df, 
+                               tweets_coronavirus6.df, 
+                               tweets_coronavirus7.df, 
+                               tweets_coronavirus8.df, 
+                               tweets_coronavirus9.df)
+
+#Write to CSV file
+#write.csv(corona_virus_tweets_df, "corona_virus_tweets_df.csv", quote = FALSE, row.names = FALSE)
+
+```
+
+Removing the unused columns
+```{r}
+#Remove columns
+remove_cols = c('favorited', 'favoriteCount', 'replyToSN', 'replyToUID', 'replyToSID', 'statusSource', 'longitude', 'latitude')
+corona_virus_tweets_df = select(corona_virus_tweets_df, -remove_cols)
+
+#Display table with 5 rows
+knitr::kable(head(corona_virus_tweets_df, 5))
+
+#Display shape or size of dataframe table
+sprintf("Dataframe size is: %d x %d", nrow(corona_virus_tweets_df), ncol(corona_virus_tweets_df))
+
+```
+
+Split a column into tokens using the function unnest_tokens and generate plot for frequent words appeared in tweets.
+```{r}
+tweet_words = 
+  corona_virus_tweets_df %>%
+    select(id, text) %>%
+    unnest_tokens(word, text)
+
+tweet_words %>% 
+  count(word, sort = T) %>% 
+  slice(1:20) %>%
+  ggplot(aes(x = reorder(word, n, function(n) -n), y = n)) + 
+  geom_bar(stat = "identity") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  xlab("")
+```
+
+Tweets timeline
+```{r}
+#plot tweets timeline
+corona_virus_tweets_df %>%
+  # UCT time in hh:mm format
+  mutate(created_at = substr(created, 12, 16)) %>%
+  count(created_at) %>%
+  ggplot(aes(x = as.numeric(as.factor(created_at)), y = n, group = 1)) +
+  geom_line(size = 1, show.legend = FALSE) +
+  geom_vline(xintercept = 7, colour = "red") +
+  labs(x = "UCT time (hh:mm)", y = "Number of Tweets") + 
+  theme_function() +
+  scale_x_continuous(breaks = c(1,250,500,750,1000,
+                              1250,1500,1750,2000,2250),
+                     labels = c("01:13","01:17","01:22","01:27","01:32",
+                              "01:37","01:42","01:47","01:52","01:57"))
+```
+
+##Data Cleaning
+
+###Text Cleaning
+The objective of this step is to clean noise those are less relevant to find the sentiment of tweets such as punctuation, special characters, numbers, and terms which don’t carry much weightage in context to the text. The first function performs cleaning and preprocessing steps to a build a corpus, which is a collection of text documents. Apply the transformation including changing letters to lower case, removing punctuations/numbers and removing stop words. The general English stop-word list is tailored by adding "available" and "via" and removing "very".
+
+ * removePunctuation(). Remove all punctuation marks
+ * stripWhitespace(). Remove excess whitespace
+ * tolower(). Make all characters lowercase
+ * removeWords(). Remove some common stop words
+ * removeNumbers(). Remove numbers
+
+```{r}
+
+# build a corpus, and specify the source to be character vectors. A vector source interprets each element of the vector x as a document.
+myCorpus = Corpus(VectorSource(corona_virus_tweets_df$text))
+
+# remove punctuation
+myCorpus = tm_map(myCorpus, removePunctuation)
+
+# remove numbers
+myCorpus = tm_map(myCorpus, removeNumbers)
+
+# function to remove URLs (http*)
+removeURL = function(x) gsub("http[^[:space:]]*", "", x)
+
+# Apply transformation function on corpus to remove URLs (http*)
+myCorpus = tm_map(myCorpus, content_transformer(removeURL))
+
+# convert to lower case
+myCorpus = tm_map(myCorpus, content_transformer(tolower))
+
+# function to remove anything other than English letters or space
+removeNumPunct = function(x) gsub("[^[:alpha:][:space:]]*", "", x)
+
+# Apply transformation function on corpus to remove numbers and special characters
+myCorpus <- tm_map(myCorpus, content_transformer(removeNumPunct))
+
+# Construct the stopwords to remove
+myStopwords = c(stopwords(language = "en", source = "smart"), "RT", "rt", "the")
+
+#Exclude the words from stopwords
+idx = which(myStopwords == "very")
+myStopwords = myStopwords[-idx]
+
+#remove stopwords
+myCorpus = tm_map(myCorpus, removeWords, myStopwords)
+
+#remove extra whitespace
+myCorpus = tm_map(myCorpus, stripWhitespace)
+
+#Number of stop words
+sprintf("Number of words removed from tweets: %s", length(myStopwords))
+```
+
+ 
+### Document Stemming
+This process is also known as Tokenization. In many cases, words need to be stemmed to retrieve their radicals. For instance, "example" and "examples" are both stemmed to "example". However, after that, one may want to complete the stems to their original forms, so that the words would look "normal". We have chosen to keep stemming as optional for our study. Below steps will demonstrate to generate stem words for given corpus.
+
+```{r}
+#Temp corpus object to apply stemming
+#dictCorpus = myCorpus
+#dictCorpusCopy = myCorpus
+#
+##stem words
+#dictCorpus = tm_map(dictCorpus, stemDocument)
+#
+##Print the first three documents in the built corpus
+#inspect(dictCorpus[1:3])
+#
+##Function to heuristically complete stemmed words for given corpus
+#stemCompletion2 = function(x, dictionary) {
+#  x <- unlist(strsplit(as.character(x), " "))
+#  x <- x[x != ""]
+#  x <- stemCompletion(x, dictionary = dictionary)
+#  x <- paste(x, sep = "", collapse = " ")
+#  PlainTextDocument(stripWhitespace(x))
+#}
+
+#Apply a function over list or vector for Stem Completion on given corpus object
+#myCorpus = lapply(dictCorpus, stemCompletion2, dictionary = dictCorpusCopy)
+#myCorpus = Corpus(VectorSource(myCorpus))
+#inspect(dictCorpus[1:3])
+
+# stem completion
+#myCorpus = tm_map(myCorpus, stemCompletion, dictionary=dictCorpus)
+
+#Print the first three documents in the built corpus.
+#inspect(myCorpus[1:3])
+
+#Something unexpected in the above stemming and stem completion is that,
+#word "mining" is first stemmed to "mine", and then is completed to "miners",
+#instead of "mining", although there are many instances of "mining" in the
+#tweets, compared to only one instance of "miners".
+
+```
+
+## Build Term Document Matrix for Frequency Analysis
+
+Let's think Document Term Matrix (DTM) as a implementation of the Bag of Words concept.  Document Term Matrix is tracking the term frequency for each term by each document. We start with the Bag of Words representation of the documents and then for each document, we track the number of time a term exists. So, DTM representation contains each distinct term from the corpus ( a collection of documents)  and the count of each distinct term in each document. Term count is a common metric to  use in a Document Term Matrix as one of metric. 
+
+The DTM representation is a fairly simple way to represent the documents as a numeric structure. Representing text as a numerical structure is a common starting point for text mining and analytics such as search and ranking, creating taxonomies, categorization, document similarity, and  text-based machine learning like clustering, classification and association analysis. 
+
+```{r}
+#Creating the document term matrix (DTM) is the main step in the analysis
+myDtm = TermDocumentMatrix(myCorpus, control = list(minWordLength = 1,
+                                                    weighting =
+                                                      function(x)
+                                                       weightTfIdf(x, normalize = FALSE), stopwords = TRUE))
+
+#Print the number of term words from Document-Term Matrix object 
+sprintf("Number of term from Document-Term Matrix object: %s", length(myDtm[["dimnames"]][["Terms"]]))
+
+#Display Document-Term Matrix object 
+#tm::inspect(myDtm)
+knitr::kable(tm::inspect(myDtm))
+
+sprintf("Results indicate that our corpus has %s documents and %s terms (features). Sparsity index refers 100 percent",
+        length(myDtm[["dimnames"]][["Docs"]]), 
+        length(myDtm[["dimnames"]][["Terms"]]))
+
+ids = which(dimnames(myDtm)$Terms %in% c("china", "coronavirus", "news"))
+knitr::kable(as.matrix(myDtm[ids, 21:25]))
+
+#Find the sum of words in each Document
+rowTotals = apply(myDtm , 1, sum)
+
+#remove all docs without words
+myDtm = myDtm[rowTotals > 0, ]
+
+#Frequent Terms and Association
+freq.terms = findFreqTerms(myDtm, lowfreq = 2000)
+knitr::kable(freq.terms)
+
+term.freq = rowSums(as.matrix(myDtm))
+term.freq = subset(term.freq, term.freq >= 2000)
+df_term_freq = data.frame(term = names(term.freq), freq = term.freq)
+
+#Filter only English characters
+#library(stringi)
+#df$isASCII = stri_enc_isascii(df$term)
+#df = filter(df, isASCII == TRUE) 
+
+#Plot Top Frequent Terms
+ggplot(df_term_freq, aes(x = df_term_freq$term, y = df_term_freq$freq)) + 
+  geom_bar(stat = "identity") +
+  xlab("Terms") + 
+  ylab("Count") +
+  coord_flip() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+##Inspect terms correlations
+```{r}
+
+#Install the packages
+if (!requireNamespace("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+BiocManager::install()
+#source("https://bioconductor.org/biocLite.R")
+#biocLite("Rgraphviz")
+library(graph)
+BiocManager::install()
+BiocManager::install(c("GenomicFeatures", "Rgraphviz"), update = TRUE, ask = FALSE)
+#library(Rgraphviz)
+
+#plot word association graph
+plot(myDtm, term = freq.terms, corThreshold = 0.1, weighting = T)
+
+```
+
+##Associations
+
+Implement shiny app for user interaction to find interactive term association in a term-document matrix.
+```{r}
+# Find which words are associated with "coronavirus"?
+fnd_assoc = findAssocs(myDtm, 'artificialintelligence', 0.1)
+knitr::kable(fnd_assoc)
+```
+
+## Wordcloud (tag cloud)
+
+A wordcloud plot is a useful visualization that expresses frequency of terms. To make it effective, we will remove infrequent terms using the removeSparseTerms function. 
+```{r}
+library(wordcloud)
+
+#Remove sparse terms with any null documents
+tdm2 = removeSparseTerms(myDtm, sparse = 0.98)
+m = as.matrix(tdm2)
+
+#calculate the frequency of words and sort it by frequency
+word.freq = sort(rowSums(m), decreasing=TRUE)
+wordTags = names(word.freq)
+wordcloud_df = data.frame(word=wordTags, freq=word.freq)
+
+#Plot word cloud
+set.seed(7)
+wordcloud(wordcloud_df$word, wordcloud_df$freq, min.freq=200, colors = brewer.pal(5, "Blues"))
+```
+
+##Clustering
+Two clustering analysis themes can be done here:
+ * Word/term Hierarchical clustering
+ * Kmeans clustering
+ 
+###Word/term Hierarchical Clustering
+To make our analysis scalable, we will remove infrequent terms. Use the removeSparseTerms function. 
+
+```{r}
+#Load the libraries
+library(clustree)
+library(dendextend)
+library(factoextra)
+library(FactoMineR)
+
+#Remove sparse terms
+dtm_v1 = removeSparseTerms(myDtm, sparse = 0.98)
+dtm_v1 = as.matrix(dtm_v1)
+
+#Compute distances for cluster terms
+distMatrix = dist(scale(dtm_v1))
+
+#Hierarchical clustering
+fit = hclust(distMatrix, method = "ward.D2")
+
+#Plot the dendrogram
+plot(fit, cex = 0.6)
+
+#Cut tree into 9 clusters
+rect.hclust(fit, k = 9, border = 2:5)
+```
+
+###Kmeans Clustering
+```{r}
+#Remove sparse terms
+dtm_v1 = removeSparseTerms(myDtm, sparse = 0.98)
+dtm_v1 = as.matrix(dtm_v1)
+
+dtm_v2 = t(dtm_v1) # transpose the matrix to cluster documents (tweets)
+set.seed(122) # set a fixed random seed
+k = 9 # number of clusters
+kmeansResult = kmeans(dtm_v2, k)
+#round(kmeansResult$centers, digits = 3) # cluster centers
+
+for (i in 1:k) {
+  cat(paste("cluster ", i, ": ", sep = ""))
+  s = sort(kmeansResult$centers[i, ], decreasing = T)
+  cat(names(s)[1:8], "\n")
+  # print the tweets of every cluster
+  # print(tweets[which(kmeansResult�cluster==i)])
+}
+```
+
+##Topic Modelling
+```{r}
+#library(topicmodels)
+#library(data.table)
+#
+#dtm = as.DocumentTermMatrix(myDtm)
+#lda = LDA(dtm, k = 8) # find 8 topics
+#term = terms(lda, 7) # first 7 terms of every topic
+#(term = apply(term, MARGIN = 2, paste, collapse = ", "))
+#
+## first topic identified for every document (tweet)
+#topics = topics(lda) # 1st topic identified for every document (tweet)
+#topics = data.frame(date = as.IDate(corona_virus_tweets_df$created), topic = topics)
+#ggplot(topics, aes(date, fill = term[topic])) +
+#geom_density(position = "stack")
+
+```
+
+##Sentiment Analysis
+```{r}
+##Install package sentiment140
+#require(devtools)
+#install_github("sentiment140", "okugami79")
+#
+#library(sentimentr)
+#sentiments = sentiment_by(corona_virus_tweets_df$text)
+#sentiments = as.data.frame(sentiments)
+#
+## sentiment plot
+#colnames(sentiments)=c("score")
+#sentiments$date = as.IDate(corona_virus_tweets_df$created)
+#result = aggregate(score ~ date, data = sentiments, sum)
+#plot(result, type = "1")
+#
+## sentiment analysis
+#sentiments = sentiment(corona_virus_tweets_df$text)
+#table(sentiments$polarity)
+#
+## sentiment plot
+#sentiments$score <- 0
+#sentiments$score[sentiments$polarity == "positive"] <- 1
+#sentiments$score[sentiments$polarity == "negative"] <- -1
+#sentiments$date <- as.IDate(tweets.df$created)
+#result <- aggregate(score ~ date, data = sentiments, sum)
+#plot(result, type = "l")
+
+```
+
